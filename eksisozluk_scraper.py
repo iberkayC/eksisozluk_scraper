@@ -133,7 +133,7 @@ async def main(threads: list):
     """Scrapes threads from eksisozluk
 
     Args:
-        threads (list): _description_
+        threads (list): list of threads to scrape, part of the url after the /, before possibly ?.
     """
     scraper = EksiSozlukScraper(BASE_URL)
     header = {
