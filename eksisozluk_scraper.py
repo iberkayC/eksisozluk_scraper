@@ -6,16 +6,20 @@ writes them to csv files.
 """
 import argparse
 import csv
+import time
 import asyncio
+import sys
 import aiohttp
 import backoff
 from bs4 import BeautifulSoup
 
 BASE_URL = 'https://eksisozluk111.com/'
 
+
 class EksiSozlukScraper:
     """Scrapes threads from eksisozluk
     """
+
     def __init__(self, base_url: str) -> None:
         """Initializes EksiSozlukScraper with base_url
 
@@ -150,12 +154,27 @@ async def main(threads: list):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Scrape threads from eksisozluk.com')
-    parser.add_argument('-t', '--threads', metavar='thread', required=True, type=str, nargs='+',
+    parser.add_argument('-t', '--threads', metavar='thread', required=False, type=str, nargs='+',
                         help='Threads to scrape, part of the url after the /, before possibly ?.')
+    parser.add_argument('-f', '--file', metavar='file', required=False, type=str,
+                        help='File to read threads from, one thread per line.')
     args = parser.parse_args()
 
-    import time
-    start_time = time.perf_counter()
-    asyncio.run(main(args.threads))
-    print(f'It took {time.perf_counter() - start_time} seconds\
-          to scrape {len(args.threads)} thread(s).')
+    MAX_THREADS_AT_ONCE = 30
+
+    thread_list = args.threads if args.threads else []
+    if args.file:
+        with open(args.file, 'r', encoding='utf-8') as file:
+            thread_list.extend([line.strip() for line in file.readlines()])
+
+    if thread_list:
+        for i in range(0, len(thread_list), MAX_THREADS_AT_ONCE):
+            thread_subset = thread_list[i:i + MAX_THREADS_AT_ONCE]
+            start_time = time.perf_counter()
+            asyncio.run(main(thread_subset))
+            print(f'It took {time.perf_counter()
+                  - start_time} seconds to scrape {len(thread_subset)} thread(s).')
+
+    if not thread_list:
+        print('No threads provided, exiting.')
+        sys.exit(0)
