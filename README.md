@@ -8,26 +8,34 @@ clone the repo to your local machine.
 
 navigate to the cloned directory and run the following code to install the requirements:
 
-```bash
+```
 pip3 install -r requirements.txt
 ```
 
 ## usage
 
-run the scraper with the following command in the terminal:
+the scraper can be run from the terminal with command-line arguments or by specifying a file containing thread URLs. the basic usage is as follows:
 
-```bash
-python3 eksisozluk_scraper.py -t [thread1] [thread2] ...
 ```
-replace `[thread1] [thread2] ...` with threads you want to scrape, use the parts of the url after the '/'. for example:
+python3 eksisozluk_scraper.py -t [thread1] [thread2] ... -f [inputFile.txt]
+```
+replace `[thread1] [thread2] ...` with threads or `[inputFile.txt]` with a file containing threads to scrape line by line. for specifying threads, use the part of the url after '/' and before possible '?'. for example:
 
-```bash
+```
 python3 eksisozluk_scraper.py -t murat-kurum--2582131 ekrem-imamoglu--2577439
 ```
+or
+```
+python3 eksisozluk_scraper.py -f threads.txt
+```
 
+where in threads.txt, threads are listed as such:
+```
+murat-kurum--2582131
+ekrem-imamoglu--2577439
+...
+```
 ## known problems
-
-threads in the nature of 'ekrem imamoglu' and 'ekrem imamoğlu' gets saved to the same csv, impact is negligible, easily fixable.
 
 long links get shortened with dots in eksisozluk, not clickable in the csv. impact is low for most usecases.
 

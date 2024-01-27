@@ -129,8 +129,8 @@ class EksiSozlukScraper:
                  for page in range(1, int(number_of_pages) + 1)]
         await asyncio.gather(*tasks)
 
-        thread_name = thread.split('--')[0].replace('-', ' ')
-        self.write_to_csv(f'{thread_name}.csv', scraped_data)
+        # thread_name = thread.split('--')[0].replace('-', ' ')
+        self.write_to_csv(f'{thread}.csv', scraped_data)
 
 
 async def main(threads: list):
