@@ -17,16 +17,16 @@ pip3 install -r requirements.txt
 the scraper can be run from the terminal with command-line arguments or by specifying a file containing thread URLs. the basic usage is as follows:
 
 ```
-python3 eksisozluk_scraper.py -t [thread1] [thread2] ... -f [inputFile.txt]
+python3 main.py -t [thread1] [thread2] ... -f [inputFile.txt]
 ```
 replace `[thread1] [thread2] ...` with threads or `[inputFile.txt]` with a file containing threads to scrape line by line. for specifying threads, use the part of the url after '/' and before possible '?'. for example:
 
 ```
-python3 eksisozluk_scraper.py -t murat-kurum--2582131 ekrem-imamoglu--2577439
+python3 main.py -t murat-kurum--2582131 ekrem-imamoglu--2577439
 ```
 or
 ```
-python3 eksisozluk_scraper.py -f threads.txt
+python3 main.py -f threads.txt
 ```
 
 where in threads.txt, threads are listed as such:
