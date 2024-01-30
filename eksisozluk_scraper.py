@@ -17,8 +17,7 @@ from bs4 import BeautifulSoup
 
 BASE_URL = 'https://eksisozluk111.com/'
 logging.basicConfig(filename='eksisozluk_scraper.log', level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
+                    format='%(asctime)s - %(message)s')
 
 class EksiSozlukScraper:
     """Scrapes threads from eksisozluk
@@ -134,7 +133,7 @@ class EksiSozlukScraper:
                  for page in range(1, int(number_of_pages) + 1)]
         await asyncio.gather(*tasks)
 
-        # thread_name = thread.split('--')[0].replace('-', ' ')
+        await self.write_to_csv(f'{thread}.csv', scraped_data)
         logging.info('Successfully scraped thread: %s', thread)
 
 
@@ -177,9 +176,8 @@ if __name__ == '__main__':
             for i in range(0, len(thread_list), MAX_THREADS_AT_ONCE):
                 thread_subset = thread_list[i:i + MAX_THREADS_AT_ONCE]
                 start_time = time.perf_counter()
+                logging.info('Started scraping.')
                 asyncio.run(main(thread_subset))
-                logging.info('Successfully scraped %d thread(s).',
-                             len(thread_subset))
 
         if not thread_list:
             print('No threads provided, exiting.')
