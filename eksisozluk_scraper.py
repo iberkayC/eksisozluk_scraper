@@ -9,11 +9,15 @@ import csv
 import time
 import asyncio
 import sys
+import logging
+import aiofiles
 import aiohttp
 import backoff
 from bs4 import BeautifulSoup
 
 BASE_URL = 'https://eksisozluk111.com/'
+logging.basicConfig(filename='eksisozluk_scraper.log', level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
 class EksiSozlukScraper:
@@ -30,22 +34,21 @@ class EksiSozlukScraper:
         self.base_url = base_url
 
     @staticmethod
-    def write_to_csv(filename: str,
-                     data: list) -> None:
-        """Writes data to csv file
+    async def write_to_csv(filename: str,
+                           data: list) -> None:
+        """Asynchronous data writing to csv file.
 
         Args:
-            filename (str): name of the file to write
-            data (list): data to write
+            filename (str): the name of the file to write.
+            data (list): the data to write.
         """
-
-        with open(filename, 'w', encoding='utf-8', newline='') as f:
+        async with aiofiles.open(filename, 'w', encoding='utf-8', newline='') as f:
             fieldnames = ['Content', 'Author', 'Date Created', 'Last Changed']
             writer = csv.DictWriter(f, fieldnames=fieldnames)
 
-            writer.writeheader()
+            await writer.writeheader()
             for row in data:
-                writer.writerow(row)
+                await writer.writerow(row)
 
     async def find_number_of_pages(self,
                                    session: aiohttp.ClientSession,
@@ -83,31 +86,33 @@ class EksiSozlukScraper:
             semaphore (asyncio.Semaphore): semaphore to limit the number of concurrent requests
             scraped_data (list): list to append the scraped data
         """
+        try:
+            async with semaphore:
+                async with session.get(url) as response:
+                    soup = BeautifulSoup(await response.text(), 'lxml')
+                    entries = soup.find_all(id='entry-item')
+                    for entry in entries:
+                        content = entry.find(class_='content').text.strip()
+                        author = entry.find(class_='entry-author').text.strip()
+                        entry_date_text = entry.find(
+                            class_='entry-date').text.strip()
 
-        async with semaphore:
-            async with session.get(url) as response:
-                soup = BeautifulSoup(await response.text(), 'lxml')
-                entries = soup.find_all(id='entry-item')
-                for entry in entries:
-                    content = entry.find(class_='content').text.strip()
-                    author = entry.find(class_='entry-author').text.strip()
-                    entry_date_text = entry.find(
-                        class_='entry-date').text.strip()
+                        if '~' in entry_date_text:
+                            date_created, last_changed = [
+                                part.strip() for part in entry_date_text.split('~')]
+                        else:
+                            date_created = entry_date_text
+                            last_changed = 'null'
 
-                    if '~' in entry_date_text:
-                        date_created, last_changed = [
-                            part.strip() for part in entry_date_text.split('~')]
-                    else:
-                        date_created = entry_date_text
-                        last_changed = 'null'
-
-                    entry_data = {
-                        'Content': content,
-                        'Author': author,
-                        'Date Created': date_created,
-                        'Last Changed': last_changed
-                    }
-                    scraped_data.append(entry_data)
+                        entry_data = {
+                            'Content': content,
+                            'Author': author,
+                            'Date Created': date_created,
+                            'Last Changed': last_changed
+                        }
+                        scraped_data.append(entry_data)
+        except Exception as exc:
+            logging.error('Error scraping page: %s, error: %s', url, exc)
 
     async def scrape_thread(self,
                             session: aiohttp.ClientSession,
@@ -130,7 +135,7 @@ class EksiSozlukScraper:
         await asyncio.gather(*tasks)
 
         # thread_name = thread.split('--')[0].replace('-', ' ')
-        self.write_to_csv(f'{thread}.csv', scraped_data)
+        logging.info('Successfully scraped thread: %s', thread)
 
 
 async def main(threads: list):
@@ -152,29 +157,32 @@ async def main(threads: list):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Scrape threads from eksisozluk.com')
-    parser.add_argument('-t', '--threads', metavar='thread', required=False, type=str, nargs='+',
-                        help='Threads to scrape, part of the url after the /, before possibly ?.')
-    parser.add_argument('-f', '--file', metavar='file', required=False, type=str,
-                        help='File to read threads from, one thread per line.')
-    args = parser.parse_args()
+    try:
+        parser = argparse.ArgumentParser(
+            description='Scrape threads from eksisozluk.com')
+        parser.add_argument('-t', '--threads', metavar='thread', required=False, type=str, nargs='+',
+                            help='Threads to scrape, part of the url after the /, before possibly ?.')
+        parser.add_argument('-f', '--file', metavar='file', required=False, type=str,
+                            help='File to read threads from, one thread per line.')
+        args = parser.parse_args()
 
-    MAX_THREADS_AT_ONCE = 30
+        MAX_THREADS_AT_ONCE = 30
 
-    thread_list = args.threads if args.threads else []
-    if args.file:
-        with open(args.file, 'r', encoding='utf-8') as file:
-            thread_list.extend([line.strip() for line in file.readlines()])
+        thread_list = args.threads if args.threads else []
+        if args.file:
+            with open(args.file, 'r', encoding='utf-8') as file:
+                thread_list.extend([line.strip() for line in file.readlines()])
 
-    if thread_list:
-        for i in range(0, len(thread_list), MAX_THREADS_AT_ONCE):
-            thread_subset = thread_list[i:i + MAX_THREADS_AT_ONCE]
-            start_time = time.perf_counter()
-            asyncio.run(main(thread_subset))
-            print(f'It took {time.perf_counter()
-                  - start_time} seconds to scrape {len(thread_subset)} thread(s).')
+        if thread_list:
+            for i in range(0, len(thread_list), MAX_THREADS_AT_ONCE):
+                thread_subset = thread_list[i:i + MAX_THREADS_AT_ONCE]
+                start_time = time.perf_counter()
+                asyncio.run(main(thread_subset))
+                logging.info('Successfully scraped %d thread(s).',
+                             len(thread_subset))
 
-    if not thread_list:
-        print('No threads provided, exiting.')
-        sys.exit(0)
+        if not thread_list:
+            print('No threads provided, exiting.')
+            sys.exit(0)
+    except Exception as e:
+        logging.error('Error scraping threads: %s', e)
