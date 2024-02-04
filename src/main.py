@@ -32,10 +32,13 @@ async def main(threads: list):
     }
 
     async with aiohttp.ClientSession(headers=header) as session:
-        for thread in threads:
-            scraped_data = await scraper.scrape_thread(session, thread)
+        scrape_tasks = [scraper.scrape_thread(session, thread) for thread in threads]
+        results = await asyncio.gather(*scrape_tasks)
+
+        for thread, scraped_data in zip(threads, results):
             await CSVWriter.write_to_csv(f'{thread}.csv', scraped_data)
             logging.info('Successfully scraped and saved thread %s', thread)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
