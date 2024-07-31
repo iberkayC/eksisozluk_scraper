@@ -1,6 +1,8 @@
 """
 Contains the EksiSozlukScraper class. Scrapes threads from eksisozluk.com
 """
+from typing import List, Dict, Any
+import logging
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
@@ -33,12 +35,43 @@ class EksiSozlukScraper:
         Returns:
             int: number of pages in the thread.
         """
-        async with session.get(url) as response:
-            soup = BeautifulSoup(await response.text(), 'lxml')
-            pager_div = soup.find('div', class_='pager')
-            if pager_div and 'data-pagecount' in pager_div.attrs:
-                return pager_div['data-pagecount']
+        try:
+            async with session.get(url) as response:
+                soup = BeautifulSoup(await response.text(), 'lxml')
+                pager_div = soup.find('div', class_='pager')
+                if pager_div and 'data-pagecount' in pager_div.attrs:
+                    return int(pager_div['data-pagecount'])
+                return 1
+        except Exception as e:
+            logging.error(f"Unexpected error in find_number_of_pages: {e}")
             return 1
+
+
+    def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
+        """
+        Parses an entry and returns a dictionary with the content, 
+        author, date created and last changed.
+
+        Args:
+            entry (BeautifulSoup): an entry in the thread
+        """
+        content = entry.find(class_='content').text.strip()
+        author = entry.find(class_='entry-author').text.strip()
+        entry_date_text = entry.find(class_='entry-date').text.strip()
+
+        if '~' in entry_date_text:
+            date_created, last_changed = [
+                part.strip() for part in entry_date_text.split('~')]
+        else:
+            date_created = entry_date_text
+            last_changed = 'null'
+
+        return {
+            'Content': content,
+            'Author': author,
+            'Date Created': date_created,
+            'Last Changed': last_changed
+        }
 
 
     @backoff.on_exception(backoff.expo,
@@ -48,8 +81,7 @@ class EksiSozlukScraper:
     async def scrape_page(self,
                           session: aiohttp.ClientSession,
                           url: str,
-                          semaphore: asyncio.Semaphore,
-                          scraped_data: list) -> None:
+                          semaphore: asyncio.Semaphore) -> List[Dict[str, Any]]:
         """
         Scrapes a page and appends the data to scraped_data
 
@@ -60,30 +92,14 @@ class EksiSozlukScraper:
             scraped_data (list): list to append the scraped data
         """
         async with semaphore:
-            async with session.get(url) as response:
-                soup = BeautifulSoup(await response.text(), 'lxml')
-                entries = soup.find_all(id='entry-item')
-                for entry in entries:
-                    content = entry.find(class_='content').text.strip()
-                    author = entry.find(class_='entry-author').text.strip()
-                    entry_date_text = entry.find(
-                        class_='entry-date').text.strip()
-
-                    if '~' in entry_date_text:
-                        date_created, last_changed = [
-                            part.strip() for part in entry_date_text.split('~')]
-                    else:
-                        date_created = entry_date_text
-                        last_changed = 'null'
-
-                    entry_data = {
-                        'Content': content,
-                        'Author': author,
-                        'Date Created': date_created,
-                        'Last Changed': last_changed
-                    }
-                    scraped_data.append(entry_data)
-
+            try:
+                async with session.get(url) as response:
+                    soup = BeautifulSoup(await response.text(), 'lxml')
+                    entries = soup.find_all(id='entry-item')
+                    return [self._parse_entry(entry) for entry in entries]
+            except Exception as e:
+                logging.error(f"Unexpected error in scrape_page {url}: {e}")
+                return []
 
     async def scrape_thread(self,
                             session: aiohttp.ClientSession,
@@ -98,12 +114,11 @@ class EksiSozlukScraper:
             max_concurrent_requests (int, optional): max # of concurrent requests. Defaults to 15.
         """
         semaphore = asyncio.Semaphore(max_concurrent_requests)
-        scraped_data = []
 
         thread_url = self.base_url + thread
         number_of_pages = await self.find_number_of_pages(session, thread_url)
-        tasks = [self.scrape_page(session, thread_url + '?p=' + str(page), semaphore, scraped_data)
+        tasks = [self.scrape_page(session, thread_url + '?p=' + str(page), semaphore)
                  for page in range(1, int(number_of_pages) + 1)]
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
 
-        return scraped_data
+        return [entry for page in results for entry in page]

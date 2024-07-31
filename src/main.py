@@ -4,20 +4,49 @@ Asynchronously scrapes threads from eksisozluk,
 taking threads as command line arguments and 
 writes them to csv files. 
 """
+from typing import List, Literal
 import argparse
 import asyncio
 import sys
 import logging
 import aiohttp
 from eksisozluk_scraper import EksiSozlukScraper
-from csvwriter import CSVWriter
+from data_writer import DataWriter
 
-BASE_URL = 'https://www.eksisozluk111.com/'
+BASE_URL = 'https://www.eksisozluk.com/'
 
 logging.basicConfig(filename='eksisozluk_scraper.log', level=logging.INFO,
                     format='%(asctime)s - %(message)s')
 
-async def main(threads: list):
+async def process_thread(scraper: EksiSozlukScraper,
+                         session: aiohttp.ClientSession,
+                         thread: str,
+                         output_format: Literal['csv', 'json']) -> None:
+    """
+    Process a thread, scrape it and write it to a file.
+
+    Args:
+        scraper (EksiSozlukScraper): scraper object
+        session (aiohttp.ClientSession): session to make requests
+        thread (str): thread to scrape
+        output_format (csv or json): output format 
+    """
+    try:
+        logging.info('Started scraping thread %s', thread)
+        scraped_data = await scraper.scrape_thread(session, thread)
+
+        if scraped_data:
+            filename = f"{thread}.{output_format}"
+            await DataWriter.write_data(filename, scraped_data, output_format)
+            logging.info(f"Successfully scraped and saved thread {thread} to {filename}")
+        else:
+            logging.warning(f"No data scraped for thread: {thread}")
+
+    except Exception as e:
+        logging.error(f"Unexpected error in process_thread: {e}")
+
+
+async def main(threads: List[str], output_format: Literal['csv', 'json'] = 'csv') -> None:
     """
     Main function to scrape threads from eksisozluk
 
@@ -32,12 +61,8 @@ async def main(threads: list):
     }
 
     async with aiohttp.ClientSession(headers=header) as session:
-        scrape_tasks = [scraper.scrape_thread(session, thread) for thread in threads]
-        results = await asyncio.gather(*scrape_tasks)
-
-        for thread, scraped_data in zip(threads, results):
-            await CSVWriter.write_to_csv(f'{thread}.csv', scraped_data)
-            logging.info('Successfully scraped and saved thread %s', thread)
+        tasks = [process_thread(scraper, session, thread, output_format) for thread in threads]
+        await asyncio.gather(*tasks)
 
 
 if __name__ == '__main__':
@@ -54,21 +79,26 @@ if __name__ == '__main__':
                         required=False,
                         type=str,
                         help='File to read threads from, one thread per line.')
+    parser.add_argument('-o', '--output',
+                        choices=['csv', 'json'],
+                        default='csv',
+                        help='Output format (csv or json). Default is csv.')
     args = parser.parse_args()
 
-    MAX_THREADS_AT_ONCE = 30
     thread_list = args.threads if args.threads else []
 
+
     if args.file:
-        with open(args.file, 'r', encoding='utf-8') as file:
-            thread_list.extend([line.strip() for line in file.readlines()])
+        try:
+            with open(args.file, 'r', encoding='utf-8') as file:
+                thread_list.extend([line.strip() for line in file.readlines()])
+        except IOError as e:
+            logging.error(f"Error reading file {args.file}: {e}")
+            sys.exit(1)
 
     if thread_list:
-        for i in range(0, len(thread_list), MAX_THREADS_AT_ONCE):
-            thread_subset = thread_list[i:i + MAX_THREADS_AT_ONCE]
-            logging.info('Started scraping.')
-            asyncio.run(main(thread_subset))
-
+        asyncio.run(main(thread_list, args.output))
     else:
-        print('No threads provided, exiting.')
-        sys.exit(0)
+        logging.error('No threads provided. Exiting.')
+        parser.print_help()
+        sys.exit(1)
