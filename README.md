@@ -37,7 +37,7 @@ ekrem-imamoglu--2577439
 ```
 ## known problems
 
-long links get shortened with dots in eksisozluk, not clickable in the csv. impact is low for most usecases.
+long links get shortened with dots in eksisozluk, not clickable in the output. impact is low for most usecases.
 
 no whitespace between sentences if there is a paragraph break between them. impact is low.
 
