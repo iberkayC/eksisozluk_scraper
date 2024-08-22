@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 import backoff
-
+from concurrent.futures import ThreadPoolExecutor
 
 class EksiSozlukScraper:
     """
@@ -22,6 +22,7 @@ class EksiSozlukScraper:
             base_url (str): The base URL of EksiSozluk.
         """
         self.base_url = base_url
+        self.executor = ThreadPoolExecutor(max_workers=10)
 
     async def find_number_of_pages(self,
                                    session: aiohttp.ClientSession,
@@ -37,7 +38,10 @@ class EksiSozlukScraper:
         """
         try:
             async with session.get(url) as response:
-                soup = BeautifulSoup(await response.text(), 'lxml')
+                text = await response.text()
+                # run BeautifulSoup in a separate thread to avoid blocking the event loop 
+                loop = asyncio.get_running_loop()
+                soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
                 pager_div = soup.find('div', class_='pager')
                 if pager_div and 'data-pagecount' in pager_div.attrs:
                     return int(pager_div['data-pagecount'])
@@ -47,7 +51,7 @@ class EksiSozlukScraper:
             return 1
 
 
-    def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
+    async def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
         """
         Parses an entry and returns a dictionary with the content, 
         author, date created and last changed.
@@ -94,9 +98,11 @@ class EksiSozlukScraper:
         async with semaphore:
             try:
                 async with session.get(url) as response:
-                    soup = BeautifulSoup(await response.text(), 'lxml')
+                    text = await response.text()
+                    loop = asyncio.get_running_loop()
+                    soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
                     entries = soup.find_all(id='entry-item')
-                    return [self._parse_entry(entry) for entry in entries]
+                    return [await self._parse_entry(entry) for entry in entries]
             except Exception as e:
                 logging.error(f"Unexpected error in scrape_page {url}: {e}")
                 return []

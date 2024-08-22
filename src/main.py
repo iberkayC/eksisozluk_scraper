@@ -2,7 +2,9 @@
 
 Asynchronously scrapes threads from eksisozluk, 
 taking threads as command line arguments and 
-writes them to csv files. 
+writes them to csv files. Some variables are too low 
+for any real scraping, but it's good for educational
+purposes.
 """
 from typing import List, Literal
 import argparse

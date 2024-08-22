@@ -30,11 +30,13 @@ python3 main.py -f threads.txt -o csv
 ```
 
 where in threads.txt, threads are listed as such:
+
 ```
 murat-kurum--2582131
 ekrem-imamoglu--2577439
 ...
 ```
+
 ## known problems
 
 long links get shortened with dots in eksisozluk, not clickable in the output. impact is low for most usecases.
