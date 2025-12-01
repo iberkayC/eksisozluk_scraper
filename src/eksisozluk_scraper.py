@@ -4,10 +4,11 @@ Contains the EksiSozlukScraper class. Scrapes threads from eksisozluk.com
 from typing import List, Dict, Any
 import logging
 import asyncio
-import aiohttp
-from bs4 import BeautifulSoup
-import backoff
 from concurrent.futures import ThreadPoolExecutor
+
+from bs4 import BeautifulSoup
+from curl_cffi import requests
+import backoff
 
 class EksiSozlukScraper:
     """
@@ -25,31 +26,31 @@ class EksiSozlukScraper:
         self.executor = ThreadPoolExecutor(max_workers=10)
 
     async def find_number_of_pages(self,
-                                   session: aiohttp.ClientSession,
+                                   session: requests.AsyncSession,
                                    url: str) -> int:
         """Finds the number of pages in a thread
 
         Args:
-            session (aiohttp.ClientSession): session to make requests
+            session (requests.AsyncSession): session to make requests
             url (str): url of the thread
 
         Returns:
             int: number of pages in the thread.
         """
         try:
-            async with session.get(url) as response:
-                if response.status != 200:
-                    logging.error("Failed to fetch %s (status %s - %s)",
-                                  url, response.status, response.reason)
-                    return 1
-                text = await response.text()
-                # run BeautifulSoup in a separate thread to avoid blocking the event loop 
-                loop = asyncio.get_running_loop()
-                soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
-                pager_div = soup.find('div', class_='pager')
-                if pager_div and 'data-pagecount' in pager_div.attrs:
-                    return int(pager_div['data-pagecount'])
+            response = await session.get(url)
+            if response.status_code != 200:
+                logging.error("Failed to fetch %s (status %s)",
+                              url, response.status_code)
                 return 1
+            text = response.text
+            # run BeautifulSoup in a separate thread to avoid blocking the event loop 
+            loop = asyncio.get_running_loop()
+            soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
+            pager_div = soup.find('div', class_='pager')
+            if pager_div and 'data-pagecount' in pager_div.attrs:
+                return int(pager_div['data-pagecount'])
+            return 1
         except Exception as e:
             logging.error(f"Unexpected error in find_number_of_pages: {e}")
             return 1
@@ -83,47 +84,47 @@ class EksiSozlukScraper:
 
 
     @backoff.on_exception(backoff.expo,
-                          aiohttp.ClientError,
+                          requests.RequestsError,
                           max_tries=8,
                           max_time=300)
     async def scrape_page(self,
-                          session: aiohttp.ClientSession,
+                          session: requests.AsyncSession,
                           url: str,
                           semaphore: asyncio.Semaphore) -> List[Dict[str, Any]]:
         """
         Scrapes a page and appends the data to scraped_data
 
         Args:
-            session (aiohttp.ClientSession): session to make requests
+            session (requests.AsyncSession): session to make requests
             url (str): url of the page to scrape
             semaphore (asyncio.Semaphore): semaphore to limit the number of concurrent requests
             scraped_data (list): list to append the scraped data
         """
         async with semaphore:
             try:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        logging.error("Failed to fetch %s (status %s - %s)",
-                                      url, response.status, response.reason)
-                        return []
-                    text = await response.text()
-                    loop = asyncio.get_running_loop()
-                    soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
-                    entries = soup.find_all(id='entry-item')
-                    return [await self._parse_entry(entry) for entry in entries]
+                response = await session.get(url)
+                if response.status_code != 200:
+                    logging.error("Failed to fetch %s (status %s)",
+                                  url, response.status_code)
+                    return []
+                text = response.text
+                loop = asyncio.get_running_loop()
+                soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
+                entries = soup.find_all(id='entry-item')
+                return [await self._parse_entry(entry) for entry in entries]
             except Exception as e:
                 logging.error(f"Unexpected error in scrape_page {url}: {e}")
                 return []
 
     async def scrape_thread(self,
-                            session: aiohttp.ClientSession,
+                            session: requests.AsyncSession,
                             thread: str,
                             max_concurrent_requests: int = 15):
         """
         Scrapes a thread and writes the data to a csv file
 
         Args:
-            session (aiohttp.ClientSession): session to make requests
+            session (requests.AsyncSession): session to make requests
             thread (str): thread to scrape, the part of the url after the /, before, if exists, ?.
             max_concurrent_requests (int, optional): max # of concurrent requests. Defaults to 15.
         """

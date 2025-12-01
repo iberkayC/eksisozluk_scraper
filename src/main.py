@@ -11,7 +11,7 @@ import argparse
 import asyncio
 import sys
 import logging
-import aiohttp
+from curl_cffi import requests
 from eksisozluk_scraper import EksiSozlukScraper
 from data_writer import DataWriter
 
@@ -21,7 +21,7 @@ logging.basicConfig(filename='eksisozluk_scraper.log', level=logging.INFO,
                     format='%(asctime)s - %(message)s')
 
 async def process_thread(scraper: EksiSozlukScraper,
-                         session: aiohttp.ClientSession,
+                         session: requests.AsyncSession,
                          thread: str,
                          output_format: Literal['csv', 'json']) -> None:
     """
@@ -29,7 +29,7 @@ async def process_thread(scraper: EksiSozlukScraper,
 
     Args:
         scraper (EksiSozlukScraper): scraper object
-        session (aiohttp.ClientSession): session to make requests
+        session (requests.AsyncSession): session to make requests
         thread (str): thread to scrape
         output_format (csv or json): output format 
     """
@@ -62,7 +62,7 @@ async def main(threads: List[str], output_format: Literal['csv', 'json'] = 'csv'
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
     }
 
-    async with aiohttp.ClientSession(headers=header) as session:
+    async with requests.AsyncSession(headers=header, impersonate="chrome124") as session:
         tasks = [process_thread(scraper, session, thread, output_format) for thread in threads]
         await asyncio.gather(*tasks)
 
