@@ -38,6 +38,10 @@ class EksiSozlukScraper:
         """
         try:
             async with session.get(url) as response:
+                if response.status != 200:
+                    logging.error("Failed to fetch %s (status %s - %s)",
+                                  url, response.status, response.reason)
+                    return 1
                 text = await response.text()
                 # run BeautifulSoup in a separate thread to avoid blocking the event loop 
                 loop = asyncio.get_running_loop()
@@ -98,6 +102,10 @@ class EksiSozlukScraper:
         async with semaphore:
             try:
                 async with session.get(url) as response:
+                    if response.status != 200:
+                        logging.error("Failed to fetch %s (status %s - %s)",
+                                      url, response.status, response.reason)
+                        return []
                     text = await response.text()
                     loop = asyncio.get_running_loop()
                     soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
