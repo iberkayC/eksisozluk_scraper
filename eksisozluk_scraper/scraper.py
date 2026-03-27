@@ -8,7 +8,7 @@ import asyncio
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
-import backoff
+import tenacity
 
 from . import console
 
@@ -88,8 +88,10 @@ class EksiSozlukScraper:
             "Last Changed": last_changed,
         }
 
-    @backoff.on_exception(
-        backoff.expo, requests.RequestsError, max_tries=8, max_time=300
+    @tenacity.retry(
+        retry=tenacity.retry_if_exception_type(requests.RequestsError),
+        wait=tenacity.wait_exponential(),
+        stop=tenacity.stop_after_attempt(8) | tenacity.stop_after_delay(300),
     )
     async def scrape_page(
         self, session: requests.AsyncSession, url: str, semaphore: asyncio.Semaphore
