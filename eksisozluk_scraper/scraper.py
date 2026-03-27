@@ -27,34 +27,29 @@ class EksiSozlukScraper:
         """
         self.base_url = base_url
 
-    async def find_number_of_pages(
+    async def _fetch_first_page(
         self, session: requests.AsyncSession, url: str
-    ) -> int:
-        """Finds the number of pages in a thread
-
-        Args:
-            session (requests.AsyncSession): session to make requests
-            url (str): url of the thread
-
-        Returns:
-            int: number of pages in the thread.
-        """
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """Fetches the first page, returns (page_count, entries)."""
         try:
-            response = await session.get(url)
+            response = await self._fetch_page(session, url)
             if response.status_code != 200:
                 logging.error(
                     "Failed to fetch %s (status %s)", url, response.status_code
                 )
-                return 1
-            text = response.text
-            soup = BeautifulSoup(text, "lxml")
+                return 1, []
+            soup = BeautifulSoup(response.text, "lxml")
             pager_div = soup.find("div", class_="pager")
-            if pager_div and "data-pagecount" in pager_div.attrs:
-                return int(pager_div["data-pagecount"])
-            return 1
+            page_count = (
+                int(pager_div["data-pagecount"])
+                if pager_div and "data-pagecount" in pager_div.attrs
+                else 1
+            )
+            entries = soup.find_all(id="entry-item")
+            return page_count, [self._parse_entry(e) for e in entries]
         except Exception as e:
-            logging.error(f"Unexpected error in find_number_of_pages: {e}")
-            return 1
+            logging.error(f"Unexpected error fetching first page {url}: {e}")
+            return 1, []
 
     def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
         """
@@ -92,22 +87,26 @@ class EksiSozlukScraper:
         retry=tenacity.retry_if_exception_type(requests.RequestsError),
         wait=tenacity.wait_exponential(),
         stop=tenacity.stop_after_attempt(8) | tenacity.stop_after_delay(300),
+        reraise=True,
     )
+    async def _fetch_page(self, session: requests.AsyncSession, url: str):
+        """Fetches a page with retries on network errors."""
+        return await session.get(url)
+
     async def scrape_page(
         self, session: requests.AsyncSession, url: str, semaphore: asyncio.Semaphore
     ) -> List[Dict[str, Any]]:
         """
-        Scrapes a page and appends the data to scraped_data
+        Scrapes a page and returns its entries.
 
         Args:
             session (requests.AsyncSession): session to make requests
             url (str): url of the page to scrape
             semaphore (asyncio.Semaphore): semaphore to limit the number of concurrent requests
-            scraped_data (list): list to append the scraped data
         """
         async with semaphore:
             try:
-                response = await session.get(url)
+                response = await self._fetch_page(session, url)
                 if response.status_code != 200:
                     logging.error(
                         "Failed to fetch %s (status %s)", url, response.status_code
@@ -138,10 +137,15 @@ class EksiSozlukScraper:
         semaphore = asyncio.Semaphore(max_concurrent_requests)
 
         thread_url = self.base_url + thread
-        number_of_pages = await self.find_number_of_pages(session, thread_url)
+        number_of_pages, first_page_entries = await self._fetch_first_page(
+            session, thread_url
+        )
         console.thread_start(thread, number_of_pages)
 
-        running_total = 0
+        running_total = len(first_page_entries)
+        console.page_done(
+            thread, 1, number_of_pages, len(first_page_entries), running_total
+        )
 
         async def _scrape_and_report(page_num):
             nonlocal running_total
@@ -154,9 +158,7 @@ class EksiSozlukScraper:
             )
             return entries
 
-        tasks = [
-            _scrape_and_report(page) for page in range(1, int(number_of_pages) + 1)
-        ]
+        tasks = [_scrape_and_report(page) for page in range(2, number_of_pages + 1)]
         results = await asyncio.gather(*tasks)
 
-        return [entry for page in results for entry in page]
+        return first_page_entries + [entry for page in results for entry in page]

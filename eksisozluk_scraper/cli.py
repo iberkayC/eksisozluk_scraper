@@ -1,11 +1,4 @@
-"""Scrape threads from eksisozluk
-
-Asynchronously scrapes threads from eksisozluk,
-taking threads as command line arguments and
-writes them to csv files. Some variables are too low
-for any real scraping, but it's good for educational
-purposes.
-"""
+"""CLI entry point for eksi-scraper."""
 
 from typing import List, Literal
 import argparse
@@ -34,13 +27,6 @@ def extract_slug(value: str) -> str:
     if parsed.scheme in ("http", "https"):
         return parsed.path.strip("/")
     return value
-
-
-logging.basicConfig(
-    filename="eksisozluk_scraper.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-)
 
 
 async def process_thread(
@@ -111,6 +97,11 @@ async def main(
 
 
 def cli():
+    logging.basicConfig(
+        filename="eksisozluk_scraper.log",
+        level=logging.INFO,
+        format="%(asctime)s - %(message)s",
+    )
     parser = argparse.ArgumentParser(description="Scrape threads from eksisozluk.com")
     parser.add_argument(
         "-t",
