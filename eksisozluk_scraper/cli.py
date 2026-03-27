@@ -9,12 +9,13 @@ purposes.
 from typing import List, Literal
 import argparse
 import asyncio
+import csv
+import json
 import sys
 import logging
 from urllib.parse import urlparse
 from curl_cffi import requests
 from .scraper import EksiSozlukScraper
-from .data_writer import DataWriter
 
 BASE_URL = 'https://www.eksisozluk.com/'
 
@@ -53,7 +54,14 @@ async def process_thread(scraper: EksiSozlukScraper,
 
         if scraped_data:
             filename = f"{thread}.{output_format}"
-            DataWriter.write_data(filename, scraped_data, output_format)
+            if output_format == 'json':
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(scraped_data, f, ensure_ascii=False, indent=2)
+            else:
+                with open(filename, 'w', encoding='utf-8', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=scraped_data[0].keys())
+                    writer.writeheader()
+                    writer.writerows(scraped_data)
             logging.info(f"Successfully scraped and saved thread {thread} to {filename}")
         else:
             logging.warning(f"No data scraped for thread: {thread}")
