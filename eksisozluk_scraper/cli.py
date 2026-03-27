@@ -13,8 +13,8 @@ import sys
 import logging
 from urllib.parse import urlparse
 from curl_cffi import requests
-from eksisozluk_scraper import EksiSozlukScraper
-from data_writer import DataWriter
+from .scraper import EksiSozlukScraper
+from .data_writer import DataWriter
 
 BASE_URL = 'https://www.eksisozluk.com/'
 
@@ -81,7 +81,7 @@ async def main(threads: List[str], output_format: Literal['csv', 'json'] = 'csv'
         await asyncio.gather(*tasks)
 
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser(
         description='Scrape threads from eksisozluk.com')
     parser.add_argument('-t', '--threads',
@@ -117,3 +117,7 @@ if __name__ == '__main__':
         logging.error('No threads provided. Exiting.')
         parser.print_help()
         sys.exit(1)
+
+
+if __name__ == '__main__':
+    cli()

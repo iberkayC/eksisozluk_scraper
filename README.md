@@ -17,20 +17,20 @@ pip3 install -r requirements.txt
 the scraper can be run from the terminal with command-line arguments or by specifying a file containing thread URLs. the basic usage is as follows:
 
 ```
-python3 main.py -t [thread1] [thread2] ... -f [inputFile.txt] -o (csv or json)
+python3 -m eksisozluk_scraper -t [thread1] [thread2] ... -f [inputFile.txt] -o (csv or json)
 ```
 you can pass full URLs or just the slug (the part of the url after '/' and before '?'). for example:
 
 ```
-python3 main.py -t https://eksisozluk.com/murat-kurum--2582131 https://eksisozluk.com/ekrem-imamoglu--2577439 -o json
+python3 -m eksisozluk_scraper -t https://eksisozluk.com/murat-kurum--2582131 https://eksisozluk.com/ekrem-imamoglu--2577439 -o json
 ```
 or using slugs:
 ```
-python3 main.py -t murat-kurum--2582131 ekrem-imamoglu--2577439 -o json
+python3 -m eksisozluk_scraper -t murat-kurum--2582131 ekrem-imamoglu--2577439 -o json
 ```
 or from a file:
 ```
-python3 main.py -f threads.txt -o csv
+python3 -m eksisozluk_scraper -f threads.txt -o csv
 ```
 
 where in threads.txt, threads are listed as URLs or slugs, one per line:
