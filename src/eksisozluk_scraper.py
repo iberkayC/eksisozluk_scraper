@@ -64,7 +64,12 @@ class EksiSozlukScraper:
         Args:
             entry (BeautifulSoup): an entry in the thread
         """
-        content = entry.find(class_='content').text.strip()
+        content_div = entry.find(class_='content')
+        # Replace shortened link text with the full URL from href
+        for a in content_div.find_all('a', href=True):
+            if a['href'].startswith('http'):
+                a.string = a['href']
+        content = content_div.get_text(separator=' ').strip()
         author = entry.find(class_='entry-author').text.strip()
         entry_date_text = entry.find(class_='entry-date').text.strip()
 
