@@ -78,13 +78,8 @@ async def main(threads: List[str], output_format: Literal['csv', 'json'] = 'csv'
         threads (list): list of threads to scrape, part of the url after the /, before possibly ?.
     """
     scraper = EksiSozlukScraper(BASE_URL)
-    header = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like\
-            Gecko) Chrome/58.0.3029.110 Safari/537.3',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-    }
 
-    async with requests.AsyncSession(headers=header, impersonate="chrome124") as session:
+    async with requests.AsyncSession(impersonate="chrome124") as session:
         tasks = [process_thread(scraper, session, thread, output_format) for thread in threads]
         await asyncio.gather(*tasks)
 
