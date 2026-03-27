@@ -19,20 +19,24 @@ the scraper can be run from the terminal with command-line arguments or by speci
 ```
 python3 main.py -t [thread1] [thread2] ... -f [inputFile.txt] -o (csv or json)
 ```
-replace `[thread1] [thread2] ...` with threads or `[inputFile.txt]` with a file containing threads to scrape line by line. for specifying threads, use the part of the url after '/' and before possible '?'. for example:
+you can pass full URLs or just the slug (the part of the url after '/' and before '?'). for example:
 
+```
+python3 main.py -t https://eksisozluk.com/murat-kurum--2582131 https://eksisozluk.com/ekrem-imamoglu--2577439 -o json
+```
+or using slugs:
 ```
 python3 main.py -t murat-kurum--2582131 ekrem-imamoglu--2577439 -o json
 ```
-or
+or from a file:
 ```
 python3 main.py -f threads.txt -o csv
 ```
 
-where in threads.txt, threads are listed as such:
+where in threads.txt, threads are listed as URLs or slugs, one per line:
 
 ```
-murat-kurum--2582131
+https://eksisozluk.com/murat-kurum--2582131
 ekrem-imamoglu--2577439
 ...
 ```

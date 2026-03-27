@@ -11,11 +11,25 @@ import argparse
 import asyncio
 import sys
 import logging
+from urllib.parse import urlparse
 from curl_cffi import requests
 from eksisozluk_scraper import EksiSozlukScraper
 from data_writer import DataWriter
 
 BASE_URL = 'https://www.eksisozluk.com/'
+
+
+def extract_slug(value: str) -> str:
+    """Return the thread slug from either a full URL or a bare slug.
+
+    Examples:
+        'https://eksisozluk.com/murat-kurum--2582131?p=2' -> 'murat-kurum--2582131'
+        'murat-kurum--2582131' -> 'murat-kurum--2582131'
+    """
+    parsed = urlparse(value)
+    if parsed.scheme in ('http', 'https'):
+        return parsed.path.strip('/')
+    return value
 
 logging.basicConfig(filename='eksisozluk_scraper.log', level=logging.INFO,
                     format='%(asctime)s - %(message)s')
@@ -75,7 +89,7 @@ if __name__ == '__main__':
                         required=False,
                         type=str,
                         nargs='+',
-                        help='Threads to scrape, part of the url after the /, before possibly ?.')
+                        help='Threads to scrape. Accepts full URLs or slugs (part of the URL after /).')
     parser.add_argument('-f', '--file',
                         metavar='file',
                         required=False,
@@ -87,13 +101,12 @@ if __name__ == '__main__':
                         help='Output format (csv or json). Default is csv.')
     args = parser.parse_args()
 
-    thread_list = args.threads if args.threads else []
-
+    thread_list = [extract_slug(t) for t in args.threads] if args.threads else []
 
     if args.file:
         try:
             with open(args.file, 'r', encoding='utf-8') as file:
-                thread_list.extend([line.strip() for line in file.readlines()])
+                thread_list.extend([extract_slug(line.strip()) for line in file.readlines()])
         except IOError as e:
             logging.error(f"Error reading file {args.file}: {e}")
             sys.exit(1)
