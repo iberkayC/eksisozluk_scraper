@@ -4,7 +4,6 @@ Contains the EksiSozlukScraper class. Scrapes threads from eksisozluk.com
 from typing import List, Dict, Any
 import logging
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
@@ -23,7 +22,6 @@ class EksiSozlukScraper:
             base_url (str): The base URL of EksiSozluk.
         """
         self.base_url = base_url
-        self.executor = ThreadPoolExecutor(max_workers=10)
 
     async def find_number_of_pages(self,
                                    session: requests.AsyncSession,
@@ -44,9 +42,7 @@ class EksiSozlukScraper:
                               url, response.status_code)
                 return 1
             text = response.text
-            # run BeautifulSoup in a separate thread to avoid blocking the event loop 
-            loop = asyncio.get_running_loop()
-            soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
+            soup = BeautifulSoup(text, 'lxml')
             pager_div = soup.find('div', class_='pager')
             if pager_div and 'data-pagecount' in pager_div.attrs:
                 return int(pager_div['data-pagecount'])
@@ -113,8 +109,7 @@ class EksiSozlukScraper:
                                   url, response.status_code)
                     return []
                 text = response.text
-                loop = asyncio.get_running_loop()
-                soup = await loop.run_in_executor(self.executor, BeautifulSoup, text, 'lxml')
+                soup = BeautifulSoup(text, 'lxml')
                 entries = soup.find_all(id='entry-item')
                 return [await self._parse_entry(entry) for entry in entries]
             except Exception as e:
