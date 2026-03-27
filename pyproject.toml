@@ -4,13 +4,35 @@ build-backend = "hatchling.build"
 
 [project]
 name = "eksi-scraper"
-version = "0.1.0"
+version = "0.1.1"
 description = "asynchronously scrapes eksisozluk threads and exports to csv or json"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Ibrahim Berkay Ceylan", email = "ceylaniberkay@gmail.com" }
+]
+keywords = [
+    "eksisozluk", "eksi-sozluk", "eksi", "scraper", "web-scraping",
+    "asyncio", "turkish", "turkce", "forum", "sozluk", "entries",
+    "csv", "json", "data-collection", "beautifulsoup", "curl",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Text Processing :: General",
+    "Framework :: AsyncIO",
+    "Operating System :: OS Independent",
+    "Natural Language :: Turkish",
 ]
 dependencies = [
     "backoff>=2.2",
@@ -24,6 +46,7 @@ packages = ["eksisozluk_scraper"]
 
 [project.urls]
 Homepage = "https://github.com/iberkayC/eksi-scraper"
+Source = "https://github.com/iberkayC/eksi-scraper"
 
 [project.scripts]
 eksi-scraper = "eksisozluk_scraper.cli:cli"
