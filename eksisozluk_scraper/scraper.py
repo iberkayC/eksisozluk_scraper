@@ -1,6 +1,7 @@
 """
 Contains the EksiSozlukScraper class. Scrapes threads from eksisozluk.com
 """
+
 from typing import List, Dict, Any
 import logging
 import asyncio
@@ -8,6 +9,9 @@ import asyncio
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 import backoff
+
+from . import console
+
 
 class EksiSozlukScraper:
     """
@@ -23,9 +27,9 @@ class EksiSozlukScraper:
         """
         self.base_url = base_url
 
-    async def find_number_of_pages(self,
-                                   session: requests.AsyncSession,
-                                   url: str) -> int:
+    async def find_number_of_pages(
+        self, session: requests.AsyncSession, url: str
+    ) -> int:
         """Finds the number of pages in a thread
 
         Args:
@@ -38,60 +42,58 @@ class EksiSozlukScraper:
         try:
             response = await session.get(url)
             if response.status_code != 200:
-                logging.error("Failed to fetch %s (status %s)",
-                              url, response.status_code)
+                logging.error(
+                    "Failed to fetch %s (status %s)", url, response.status_code
+                )
                 return 1
             text = response.text
-            soup = BeautifulSoup(text, 'lxml')
-            pager_div = soup.find('div', class_='pager')
-            if pager_div and 'data-pagecount' in pager_div.attrs:
-                return int(pager_div['data-pagecount'])
+            soup = BeautifulSoup(text, "lxml")
+            pager_div = soup.find("div", class_="pager")
+            if pager_div and "data-pagecount" in pager_div.attrs:
+                return int(pager_div["data-pagecount"])
             return 1
         except Exception as e:
             logging.error(f"Unexpected error in find_number_of_pages: {e}")
             return 1
 
-
     def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
         """
-        Parses an entry and returns a dictionary with the content, 
+        Parses an entry and returns a dictionary with the content,
         author, date created and last changed.
 
         Args:
             entry (BeautifulSoup): an entry in the thread
         """
-        content_div = entry.find(class_='content')
+        content_div = entry.find(class_="content")
         # Replace shortened link text with the full URL from href
-        for a in content_div.find_all('a', href=True):
-            if a['href'].startswith('http'):
-                a.string = a['href']
-        content = content_div.get_text(separator=' ').strip()
-        author = entry.find(class_='entry-author').text.strip()
-        entry_date_text = entry.find(class_='entry-date').text.strip()
+        for a in content_div.find_all("a", href=True):
+            if a["href"].startswith("http"):
+                a.string = a["href"]
+        content = content_div.get_text(separator=" ").strip()
+        author = entry.find(class_="entry-author").text.strip()
+        entry_date_text = entry.find(class_="entry-date").text.strip()
 
-        if '~' in entry_date_text:
+        if "~" in entry_date_text:
             date_created, last_changed = [
-                part.strip() for part in entry_date_text.split('~')]
+                part.strip() for part in entry_date_text.split("~")
+            ]
         else:
             date_created = entry_date_text
-            last_changed = 'null'
+            last_changed = None
 
         return {
-            'Content': content,
-            'Author': author,
-            'Date Created': date_created,
-            'Last Changed': last_changed
+            "Content": content,
+            "Author": author,
+            "Date Created": date_created,
+            "Last Changed": last_changed,
         }
 
-
-    @backoff.on_exception(backoff.expo,
-                          requests.RequestsError,
-                          max_tries=8,
-                          max_time=300)
-    async def scrape_page(self,
-                          session: requests.AsyncSession,
-                          url: str,
-                          semaphore: asyncio.Semaphore) -> List[Dict[str, Any]]:
+    @backoff.on_exception(
+        backoff.expo, requests.RequestsError, max_tries=8, max_time=300
+    )
+    async def scrape_page(
+        self, session: requests.AsyncSession, url: str, semaphore: asyncio.Semaphore
+    ) -> List[Dict[str, Any]]:
         """
         Scrapes a page and appends the data to scraped_data
 
@@ -105,23 +107,26 @@ class EksiSozlukScraper:
             try:
                 response = await session.get(url)
                 if response.status_code != 200:
-                    logging.error("Failed to fetch %s (status %s)",
-                                  url, response.status_code)
+                    logging.error(
+                        "Failed to fetch %s (status %s)", url, response.status_code
+                    )
                     return []
                 text = response.text
-                soup = BeautifulSoup(text, 'lxml')
-                entries = soup.find_all(id='entry-item')
+                soup = BeautifulSoup(text, "lxml")
+                entries = soup.find_all(id="entry-item")
                 return [self._parse_entry(entry) for entry in entries]
             except Exception as e:
                 logging.error(f"Unexpected error in scrape_page {url}: {e}")
                 return []
 
-    async def scrape_thread(self,
-                            session: requests.AsyncSession,
-                            thread: str,
-                            max_concurrent_requests: int = 15):
+    async def scrape_thread(
+        self,
+        session: requests.AsyncSession,
+        thread: str,
+        max_concurrent_requests: int = 15,
+    ):
         """
-        Scrapes a thread and writes the data to a csv file
+        Scrapes a thread and returns all entries.
 
         Args:
             session (requests.AsyncSession): session to make requests
@@ -132,8 +137,24 @@ class EksiSozlukScraper:
 
         thread_url = self.base_url + thread
         number_of_pages = await self.find_number_of_pages(session, thread_url)
-        tasks = [self.scrape_page(session, thread_url + '?p=' + str(page), semaphore)
-                 for page in range(1, int(number_of_pages) + 1)]
+        console.thread_start(thread, number_of_pages)
+
+        running_total = 0
+
+        async def _scrape_and_report(page_num):
+            nonlocal running_total
+            entries = await self.scrape_page(
+                session, thread_url + "?p=" + str(page_num), semaphore
+            )
+            running_total += len(entries)
+            console.page_done(
+                thread, page_num, number_of_pages, len(entries), running_total
+            )
+            return entries
+
+        tasks = [
+            _scrape_and_report(page) for page in range(1, int(number_of_pages) + 1)
+        ]
         results = await asyncio.gather(*tasks)
 
         return [entry for page in results for entry in page]

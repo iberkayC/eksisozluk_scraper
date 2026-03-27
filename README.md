@@ -39,6 +39,31 @@ ekrem-imamoglu--2577439
 ...
 ```
 
+### options
+
+| flag | description |
+|---|---|
+| `-t, --threads` | threads to scrape (URLs or slugs) |
+| `-f, --file` | file with threads, one per line |
+| `-o, --output` | output format: `csv` (default) or `json` |
+| `-v, --verbose` | show per-page progress |
+| `-q, --quiet` | suppress all console output |
+
+### console output
+
+by default, eksi-scraper shows progress in the terminal:
+
+```
+[eksi-scraper] Scraping 2 threads
+[murat-kurum--2582131] Found 47 pages
+[ekrem-imamoglu--2577439] Found 112 pages
+[murat-kurum--2582131] Done: 470 entries in 12.3s -> murat-kurum--2582131.json
+[ekrem-imamoglu--2577439] Done: 1120 entries in 28.7s -> ekrem-imamoglu--2577439.json
+[eksi-scraper] Finished: 2 threads, 1590 entries, 28.7s elapsed
+```
+
+use `-v` for per-page progress, `-q` for silent operation.
+
 ## output
 
 each entry has the following fields:
