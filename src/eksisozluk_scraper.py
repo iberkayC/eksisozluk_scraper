@@ -52,7 +52,7 @@ class EksiSozlukScraper:
             return 1
 
 
-    async def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
+    def _parse_entry(self, entry: BeautifulSoup) -> Dict[str, Any]:
         """
         Parses an entry and returns a dictionary with the content, 
         author, date created and last changed.
@@ -111,7 +111,7 @@ class EksiSozlukScraper:
                 text = response.text
                 soup = BeautifulSoup(text, 'lxml')
                 entries = soup.find_all(id='entry-item')
-                return [await self._parse_entry(entry) for entry in entries]
+                return [self._parse_entry(entry) for entry in entries]
             except Exception as e:
                 logging.error(f"Unexpected error in scrape_page {url}: {e}")
                 return []

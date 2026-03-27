@@ -53,7 +53,7 @@ async def process_thread(scraper: EksiSozlukScraper,
 
         if scraped_data:
             filename = f"{thread}.{output_format}"
-            await DataWriter.write_data(filename, scraped_data, output_format)
+            DataWriter.write_data(filename, scraped_data, output_format)
             logging.info(f"Successfully scraped and saved thread {thread} to {filename}")
         else:
             logging.warning(f"No data scraped for thread: {thread}")

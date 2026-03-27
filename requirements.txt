@@ -1,5 +1,4 @@
 backoff==2.2.1
 beautifulsoup4==4.12.3
-aiofiles==23.2.1
 lxml==5.1.0
 curl_cffi==0.7.1
