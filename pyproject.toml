@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eksi-scraper"
+version = "0.1.0"
+description = "asynchronously scrapes eksisozluk threads and exports to csv or json"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Ibrahim Berkay Ceylan", email = "ceylaniberkay@gmail.com" }
+]
+dependencies = [
+    "backoff>=2.2",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.1",
+    "curl_cffi>=0.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["eksisozluk_scraper"]
+
+[project.urls]
+Homepage = "https://github.com/iberkayC/eksi-scraper"
+
+[project.scripts]
+eksi-scraper = "eksisozluk_scraper.cli:cli"

@@ -4,4 +4,7 @@ __pycache__/
 *.csv
 *.json
 venv/
+.venv/
+dist/
+*.egg-info/
 
