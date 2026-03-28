@@ -1,19 +1,25 @@
 """CLI entry point for eksi-scraper."""
 
-from typing import List, Literal
 import argparse
 import asyncio
 import csv
 import json
+import logging
 import sys
 import time
-import logging
+from pathlib import Path
+from typing import Literal
 from urllib.parse import urlparse
+
 from curl_cffi import requests
-from .scraper import EksiSozlukScraper
+
 from . import console
+from .scraper import EksiSozlukScraper
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.eksisozluk.com/"
+HTTP_OK = 200
 
 
 def extract_slug(value: str) -> str:
@@ -22,6 +28,7 @@ def extract_slug(value: str) -> str:
     Examples:
         'https://eksisozluk.com/murat-kurum--2582131?p=2' -> 'murat-kurum--2582131'
         'murat-kurum--2582131' -> 'murat-kurum--2582131'
+
     """
     parsed = urlparse(value)
     if parsed.scheme in ("http", "https"):
@@ -35,18 +42,17 @@ async def process_thread(
     thread: str,
     output_format: Literal["csv", "json"],
 ) -> None:
-    """
-    Process a thread, scrape it and write it to a file.
+    """Scrape a single thread and write it to a file.
 
     Args:
         scraper (EksiSozlukScraper): scraper object
         session (requests.AsyncSession): session to make requests
         thread (str): thread to scrape
         output_format (csv or json): output format
-    """
 
+    """
     try:
-        logging.info("Started scraping thread %s", thread)
+        logger.info("Started scraping thread %s", thread)
         t0 = time.monotonic()
         scraped_data = await scraper.scrape_thread(session, thread)
         elapsed = time.monotonic() - t0
@@ -54,34 +60,42 @@ async def process_thread(
         if scraped_data:
             filename = f"{thread}.{output_format}"
             if output_format == "json":
-                with open(filename, "w", encoding="utf-8") as f:
+                with Path(filename).open("w", encoding="utf-8") as f:
                     json.dump(scraped_data, f, ensure_ascii=False, indent=2)
             else:
-                with open(filename, "w", encoding="utf-8", newline="") as f:
+                with Path(filename).open(
+                    "w",
+                    encoding="utf-8",
+                    newline="",
+                ) as f:
                     writer = csv.DictWriter(f, fieldnames=scraped_data[0].keys())
                     writer.writeheader()
                     writer.writerows(scraped_data)
             console.thread_done(thread, len(scraped_data), elapsed, filename)
-            logging.info(
-                f"Successfully scraped and saved thread {thread} to {filename}"
+            logger.info(
+                "Successfully scraped and saved thread %s to %s",
+                thread,
+                filename,
             )
         else:
             console.warn(f"no entries scraped for {thread}")
-            logging.warning(f"No data scraped for thread: {thread}")
+            logger.warning("No data scraped for thread: %s", thread)
 
     except Exception as e:
         console.thread_error(thread, str(e))
-        logging.error(f"Unexpected error in process_thread: {e}")
+        logger.exception("Unexpected error in process_thread")
 
 
 async def main(
-    threads: List[str], output_format: Literal["csv", "json"] = "csv"
+    threads: list[str],
+    output_format: Literal["csv", "json"] = "csv",
 ) -> None:
-    """
-    Main function to scrape threads from eksisozluk
+    """Scrape threads from eksisozluk and write results.
 
     Args:
-        threads (list): list of threads to scrape, part of the url after the /, before possibly ?.
+        threads (list): threads to scrape (url slug)
+        output_format (str): csv or json
+
     """
     scraper = EksiSozlukScraper(BASE_URL)
     console.session_start(len(threads))
@@ -96,7 +110,8 @@ async def main(
     console.session_end()
 
 
-def cli():
+def cli() -> None:
+    """Parse arguments and run the scraper."""
     logging.basicConfig(
         filename="eksisozluk_scraper.log",
         level=logging.INFO,
@@ -129,7 +144,10 @@ def cli():
     )
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
-        "-q", "--quiet", action="store_true", help="Suppress all console output."
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress all console output.",
     )
     verbosity.add_argument(
         "-v",
@@ -144,13 +162,13 @@ def cli():
 
     if args.file:
         try:
-            with open(args.file, "r", encoding="utf-8") as file:
+            with Path(args.file).open(encoding="utf-8") as file:
                 thread_list.extend(
-                    [extract_slug(line.strip()) for line in file.readlines()]
+                    [extract_slug(line.strip()) for line in file],
                 )
-        except IOError as e:
+        except OSError as e:
             console.error(f"Cannot read file {args.file}: {e}")
-            logging.error(f"Error reading file {args.file}: {e}")
+            logger.exception("Error reading file %s", args.file)
             sys.exit(1)
 
     if thread_list:
@@ -161,7 +179,7 @@ def cli():
             sys.exit(130)
     else:
         console.error("No threads provided.")
-        logging.error("No threads provided. Exiting.")
+        logger.error("No threads provided. Exiting.")
         parser.print_help()
         sys.exit(1)
 
