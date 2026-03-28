@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "eksi-scraper"
-version = "0.2.1"
+version = "0.2.2"
 description = "asynchronously scrapes eksisozluk threads and exports to csv or json"
 readme = "README.md"
 license = "MIT"
