@@ -41,6 +41,7 @@ async def process_thread(
     session: requests.AsyncSession,
     thread: str,
     output_format: Literal["csv", "json"],
+    max_entries: int | None = None,
 ) -> None:
     """Scrape a single thread and write it to a file.
 
@@ -49,12 +50,17 @@ async def process_thread(
         session (requests.AsyncSession): session to make requests
         thread (str): thread to scrape
         output_format (csv or json): output format
+        max_entries (int | None): max entries to collect
 
     """
     try:
         logger.info("Started scraping thread %s", thread)
         t0 = time.monotonic()
-        scraped_data = await scraper.scrape_thread(session, thread)
+        scraped_data = await scraper.scrape_thread(
+            session,
+            thread,
+            max_entries=max_entries,
+        )
         elapsed = time.monotonic() - t0
 
         if scraped_data:
@@ -89,12 +95,14 @@ async def process_thread(
 async def main(
     threads: list[str],
     output_format: Literal["csv", "json"] = "csv",
+    max_entries: int | None = None,
 ) -> None:
     """Scrape threads from eksisozluk and write results.
 
     Args:
         threads (list): threads to scrape (url slug)
         output_format (str): csv or json
+        max_entries (int | None): max entries per thread
 
     """
     scraper = EksiSozlukScraper(BASE_URL)
@@ -102,7 +110,7 @@ async def main(
 
     async with requests.AsyncSession(impersonate="chrome124") as session:
         tasks = [
-            process_thread(scraper, session, thread, output_format)
+            process_thread(scraper, session, thread, output_format, max_entries)
             for thread in threads
         ]
         await asyncio.gather(*tasks)
@@ -142,6 +150,14 @@ def cli() -> None:
         default="csv",
         help="Output format (csv or json). Default is csv.",
     )
+    parser.add_argument(
+        "-n",
+        "--max-entries",
+        metavar="N",
+        type=int,
+        default=None,
+        help="Max number of entries to collect per thread.",
+    )
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-q",
@@ -173,7 +189,7 @@ def cli() -> None:
 
     if thread_list:
         try:
-            asyncio.run(main(thread_list, args.output))
+            asyncio.run(main(thread_list, args.output, args.max_entries))
         except KeyboardInterrupt:
             console.error("Interrupted by user")
             sys.exit(130)

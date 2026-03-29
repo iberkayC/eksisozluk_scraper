@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 from typing import Any
 
 import tenacity
@@ -13,6 +14,7 @@ from . import console
 logger = logging.getLogger(__name__)
 
 HTTP_OK = 200
+ENTRIES_PER_PAGE = 10
 
 
 class EksiSozlukScraper:
@@ -137,6 +139,7 @@ class EksiSozlukScraper:
         session: requests.AsyncSession,
         thread: str,
         max_concurrent_requests: int = 15,
+        max_entries: int | None = None,
     ) -> list[dict[str, Any]]:
         """Scrape a thread and return all entries.
 
@@ -144,6 +147,7 @@ class EksiSozlukScraper:
             session (requests.AsyncSession): session to make requests
             thread (str): thread slug (url path after /)
             max_concurrent_requests (int): max concurrent requests
+            max_entries (int | None): stop after collecting this many entries
 
         """
         semaphore = asyncio.Semaphore(max_concurrent_requests)
@@ -153,13 +157,25 @@ class EksiSozlukScraper:
             session,
             thread_url,
         )
-        console.thread_start(thread, number_of_pages)
+
+        if max_entries:
+            pages_needed = min(
+                number_of_pages, math.ceil(max_entries / ENTRIES_PER_PAGE),
+            )
+        else:
+            pages_needed = number_of_pages
+
+        console.thread_start(thread, pages_needed)
+
+        if max_entries and len(first_page_entries) >= max_entries:
+            console.page_done(thread, 1, pages_needed, max_entries, max_entries)
+            return first_page_entries[:max_entries]
 
         running_total = len(first_page_entries)
         console.page_done(
             thread,
             1,
-            number_of_pages,
+            pages_needed,
             len(first_page_entries),
             running_total,
         )
@@ -175,13 +191,16 @@ class EksiSozlukScraper:
             console.page_done(
                 thread,
                 page_num,
-                number_of_pages,
+                pages_needed,
                 len(entries),
                 running_total,
             )
             return entries
 
-        tasks = [_scrape_and_report(page) for page in range(2, number_of_pages + 1)]
+        tasks = [_scrape_and_report(page) for page in range(2, pages_needed + 1)]
         results = await asyncio.gather(*tasks)
 
-        return first_page_entries + [entry for page in results for entry in page]
+        all_entries = first_page_entries + [entry for page in results for entry in page]
+        if max_entries:
+            return all_entries[:max_entries]
+        return all_entries

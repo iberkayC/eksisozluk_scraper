@@ -46,6 +46,7 @@ ekrem-imamoglu--2577439
 | `-t, --threads` | threads to scrape (URLs or slugs) |
 | `-f, --file` | file with threads, one per line |
 | `-o, --output` | output format: `csv` (default) or `json` |
+| `-n, --max-entries` | max number of entries to collect per thread |
 | `-v, --verbose` | show per-page progress |
 | `-q, --quiet` | suppress all console output |
 
